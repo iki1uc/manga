@@ -1,0 +1,1377 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>◈ AMIGA NEON GEISTER · DER SCHALTKREIS WACHT</title>
+<style>
+  :root{
+    --ink:#02040a; --deep:#050a12;
+    --amber:#ff8a2a; --amber-glow:#ffb347;
+    --green:#39ff88; --matrix:#00ff6a;
+    --magenta:#ff3ea5; --cyan:#5cf0ff; --violet:#b388ff;
+    --text:#e8fff4; --muted:#6a8e94;
+    --line:#1e3a4a;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;overflow:hidden;background:#000;}
+  body{
+    color:var(--text);
+    font-family:"Courier New",ui-monospace,monospace;
+    letter-spacing:.04em;
+    cursor:crosshair;
+  }
+  #stage{
+    position:fixed;inset:0;width:100vw;height:100vh;display:block;
+    background:#02040a;
+  }
+  /* CRT Scanlines + Vignette overlay */
+  .crt{
+    position:fixed;inset:0;pointer-events:none;z-index:5;
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(0,0,0,0) 0px,
+        rgba(0,0,0,0) 2px,
+        rgba(0,0,0,.18) 3px,
+        rgba(0,0,0,0) 4px
+      ),
+      radial-gradient(circle at 50% 50%,
+        rgba(0,0,0,0) 30%,
+        rgba(0,0,0,.35) 75%,
+        rgba(0,0,0,.75) 100%);
+    mix-blend-mode:multiply;
+  }
+  .crt::after{
+    content:"";position:absolute;inset:0;
+    background:
+      radial-gradient(circle at 50% 40%,
+        rgba(255,138,42,.05), transparent 55%),
+      radial-gradient(circle at 20% 80%,
+        rgba(92,240,255,.04), transparent 60%);
+    mix-blend-mode:screen;
+  }
+  /* Fleckige Glass-Reflexion */
+  .glass{
+    position:fixed;inset:0;pointer-events:none;z-index:6;
+    background:
+      linear-gradient(115deg,
+        rgba(255,255,255,0) 42%,
+        rgba(255,255,255,.035) 47%,
+        rgba(255,255,255,0) 53%);
+    mix-blend-mode:screen;
+  }
+
+  /* ==== HUD ==== */
+  .hud{
+    position:fixed;inset:0;pointer-events:none;z-index:10;
+    display:grid;grid-template-rows:auto 1fr auto;
+    padding:18px 22px;
+  }
+  .hud-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
+  .tag{
+    font-size:11px;letter-spacing:.25em;color:var(--amber);
+    text-shadow:0 0 8px rgba(255,138,42,.9),0 0 20px rgba(255,138,42,.4);
+    animation:flicker 4.5s infinite;
+  }
+  @keyframes flicker{
+    0%,95%,100%{opacity:1;}
+    96%{opacity:.35;}97%{opacity:.9;}98%{opacity:.5;}99%{opacity:1;}
+  }
+  .tag small{display:block;color:var(--muted);font-size:9px;letter-spacing:.35em;margin-top:3px;text-shadow:none;}
+  .status{
+    display:flex;flex-direction:column;align-items:flex-end;gap:6px;
+    font-size:10px;color:var(--muted);letter-spacing:.2em;
+  }
+  .led{
+    display:inline-flex;align-items:center;gap:7px;
+  }
+  .led::before{
+    content:"";width:7px;height:7px;border-radius:50%;
+    background:var(--matrix);
+    box-shadow:0 0 8px var(--matrix),0 0 18px rgba(0,255,106,.5);
+    animation:pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.55;transform:scale(.75);}}
+
+  /* ==== TITLE CARD ==== */
+  .titlecard{
+    position:fixed;inset:0;z-index:50;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:
+      radial-gradient(circle at 50% 45%,
+        rgba(255,138,42,.08) 0%,
+        rgba(0,0,0,.85) 55%,
+        rgba(0,0,0,.98) 100%);
+    text-align:center;
+    transition:opacity .9s ease, transform .9s ease;
+  }
+  .titlecard.hidden{opacity:0;transform:scale(1.06);pointer-events:none;}
+  .titlecard .kicker{
+    color:var(--amber);letter-spacing:.5em;font-size:11px;
+    text-shadow:0 0 12px var(--amber);
+    margin-bottom:22px;
+  }
+  .titlecard h1{
+    margin:0;font-size:clamp(28px,6.5vw,80px);
+    letter-spacing:.22em;font-weight:900;
+    background:linear-gradient(180deg,#fff 0%,#ffb347 55%,#ff5a1f 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 0 24px rgba(255,138,42,.65));
+  }
+  .titlecard h2{
+    margin:14px 0 0;font-size:clamp(12px,1.7vw,18px);
+    letter-spacing:.65em;color:var(--matrix);
+    text-shadow:0 0 12px var(--matrix),0 0 30px rgba(0,255,106,.35);
+    font-weight:400;
+  }
+  .titlecard p{
+    margin:38px 0 0;max-width:640px;
+    color:#a7c8c2;font-size:13px;line-height:1.85;letter-spacing:.06em;
+  }
+  .titlecard p em{color:var(--amber);font-style:normal;}
+  .enter{
+    margin-top:44px;
+    padding:15px 38px;font-size:12px;letter-spacing:.32em;
+    border:1px solid var(--amber);color:var(--amber);background:transparent;
+    cursor:pointer;text-transform:uppercase;
+    box-shadow:0 0 20px rgba(255,138,42,.22),inset 0 0 20px rgba(255,138,42,.06);
+    transition:.35s;pointer-events:auto;
+    font-family:inherit;
+    position:relative;
+  }
+  .enter:hover{
+    background:rgba(255,138,42,.12);
+    box-shadow:0 0 34px rgba(255,138,42,.55),inset 0 0 24px rgba(255,138,42,.15);
+    letter-spacing:.44em;
+  }
+  .enter::before,.enter::after{
+    content:"";position:absolute;top:50%;width:24px;height:1px;
+    background:var(--amber);box-shadow:0 0 6px var(--amber);
+  }
+  .enter::before{left:-30px;} .enter::after{right:-30px;}
+  .subline{
+    margin-top:30px;font-size:9px;color:#3d5a5e;letter-spacing:.4em;
+  }
+
+  /* ==== BOTTOM BAR / CONTROLS ==== */
+  .controls{
+    pointer-events:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+    font-size:10px;letter-spacing:.18em;
+  }
+  .controls button{
+    background:rgba(6,14,22,.65);
+    border:1px solid rgba(255,138,42,.35);
+    color:var(--amber);
+    padding:9px 13px;
+    font:inherit;font-size:10px;letter-spacing:.22em;
+    cursor:pointer;text-transform:uppercase;
+    backdrop-filter:blur(6px);
+    transition:.22s;
+  }
+  .controls button:hover,.controls button.on{
+    background:rgba(255,138,42,.16);
+    border-color:var(--amber);
+    color:#fff;
+    box-shadow:0 0 16px rgba(255,138,42,.4);
+  }
+  .meter{
+    display:flex;gap:10px;align-items:center;
+    color:var(--muted);font-size:9px;letter-spacing:.25em;
+  }
+  .meter .bar{
+    width:90px;height:4px;background:rgba(255,138,42,.12);
+    border:1px solid rgba(255,138,42,.3);position:relative;overflow:hidden;
+  }
+  .meter .bar i{
+    display:block;height:100%;width:0%;
+    background:linear-gradient(90deg,var(--amber),#fff2cc);
+    box-shadow:0 0 10px var(--amber);
+    transition:width .12s linear;
+  }
+
+  /* ==== SIDE INFO ==== */
+  .legend{
+    position:fixed;left:22px;bottom:78px;z-index:10;
+    font-size:9.5px;letter-spacing:.14em;color:#5c8086;
+    line-height:1.75;pointer-events:none;
+    text-shadow:0 0 8px rgba(0,0,0,.9);
+    max-width:260px;
+  }
+  .legend b{color:var(--amber);font-weight:400;letter-spacing:.28em;}
+  .legend .row{display:flex;gap:10px;align-items:center;}
+  .legend .dot{width:6px;height:6px;border-radius:50%;}
+
+  /* ==== BOTTOM-LEFT NARRATIVE ==== */
+  .narration{
+    position:fixed;left:50%;bottom:110px;transform:translateX(-50%);
+    z-index:10;pointer-events:none;text-align:center;
+    max-width:min(760px,86vw);
+    font-size:13px;line-height:1.75;letter-spacing:.06em;
+    color:#cfe8dd;text-shadow:0 0 10px rgba(0,0,0,.9);
+    opacity:0;transition:opacity .8s;
+  }
+  .narration.show{opacity:1;}
+  .narration b{color:var(--amber);font-weight:400;letter-spacing:.28em;font-size:10px;display:block;margin-bottom:8px;}
+
+  @media(max-width:700px){
+    .hud{padding:12px;}
+    .titlecard p{font-size:11.5px;}
+    .legend{display:none;}
+    .narration{bottom:88px;font-size:11.5px;}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div class="crt"></div>
+<div class="glass"></div>
+
+<!-- HUD -->
+<div class="hud">
+  <div class="hud-top">
+    <div class="tag">
+      AMIGA NEON GEISTER
+      <small>SCHALTKREIS · 0x00FF6A · GEIST-EXE</small>
+    </div>
+    <div class="status">
+      <span class="led" id="stateLed">SYSTEM WACHT</span>
+      <span id="fpsLabel">60 FPS</span>
+      <span id="timeLabel">00:00:00</span>
+    </div>
+  </div>
+
+  <div></div>
+
+  <div class="controls">
+    <button id="btnBreath" class="on">◈ ATEM · ON</button>
+    <button id="btnSound">♫ AMBIENT HUM</button>
+    <button id="btnGlitch">⚡ GLITCH</button>
+    <button id="btnRain" class="on">道 MATRIX · ON</button>
+    <button id="btnWarp">◐ WARP</button>
+    <button id="btnFull">⛶ FULL</button>
+    <div class="meter">
+      <span>NEON</span>
+      <div class="bar"><i id="meterNeon"></i></div>
+      <span>BASS</span>
+      <div class="bar"><i id="meterBass"></i></div>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <b>◈ SCHALTKREIS</b>
+  <div class="row"><span class="dot" style="background:#00ff6a;box-shadow:0 0 8px #00ff6a;"></span> MATRIX-REGEN</div>
+  <div class="row"><span class="dot" style="background:#ff8a2a;box-shadow:0 0 8px #ff8a2a;"></span> LICHTKLINGE</div>
+  <div class="row"><span class="dot" style="background:#ff3ea5;box-shadow:0 0 8px #ff3ea5;"></span> BIOLUMINESZENZ</div>
+  <div class="row"><span class="dot" style="background:#5cf0ff;box-shadow:0 0 8px #5cf0ff;"></span> KABELGEIST</div>
+</div>
+
+<div class="narration" id="narration"></div>
+
+<!-- TITLE CARD -->
+<div class="titlecard" id="titlecard">
+  <div class="kicker">AMIGA · 1985 · OS 3.1 · DEMOSZENE</div>
+  <h1>NEON&nbsp;GEISTER</h1>
+  <h2>DER SCHALTKREIS WACHT</h2>
+  <p>
+    Ein Geist trägt eine <em>orange Lichtklinge</em> durch den
+    biolumineszenten Dschungel. Zwischen Kabeln, Sporen und
+    fallendem Code atmet die Maschine. <em>Wer das Licht hält,
+    erinnert sich.</em>
+  </p>
+  <button class="enter" id="enter">◈ EINTRETEN</button>
+  <div class="subline">KOPFHÖRER EMPFOHLEN · CLICK TO INITIALIZE AUDIO</div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════
+   ◈ AMIGA NEON GEISTER · SCHALTKREIS-RUNTIME
+   Layer:  Matrix · Tiefe · Kabel · Figur · Klinge · Sporen · Nebel
+   ═══════════════════════════════════════════════════════════ */
+
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d', { alpha: false });
+let W = 0, H = 0, DPR = 1;
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  buildMatrix();
+  buildMushrooms();
+  buildFog();
+  buildStars();
+}
+window.addEventListener('resize', resize);
+
+/* ─── GLOBAL STATE ─────────────────────────────────────── */
+const S = {
+  t: 0, frame: 0, last: performance.now(),
+  running: false,
+  breath: true,
+  rainOn: true,
+  warp: false,
+  glitch: 0,
+  glitchTimer: 0,
+  // breathing
+  breathPhase: 0, breathCycle: 4000,
+  breathIntensity: 0,
+  // sound
+  audioCtx: null, analyser: null, source: null, humGain: null,
+  humOn: false, audioReady: false,
+  soundEnergy: 0, soundBass: 0, soundPulse: 0, lastBeat: 0,
+  spectrum: new Uint8Array(128),
+  // mouse
+  mx: 0.5, my: 0.5, tmx: 0.5, tmy: 0.5,
+  // sparks
+  sparks: [],
+  // fps
+  fpsAcc: 0, fpsFrames: 0, fps: 60,
+};
+
+/* ─── MATRIX RAIN ──────────────────────────────────────── */
+const KATA = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン";
+const LATIN = "0123456789ABCDEFアカサタナハマヤラワン";
+let matrixCols = [];
+function buildMatrix(){
+  const fontSize = Math.max(12, Math.floor(W / 110));
+  const cols = Math.ceil(W / fontSize) + 2;
+  matrixCols = [];
+  for (let i = 0; i < cols; i++){
+    matrixCols.push({
+      x: i * fontSize,
+      y: Math.random() * -H,
+      speed: 30 + Math.random() * 90,
+      fontSize,
+      chars: Array.from({length: 22}, () =>
+        KATA[Math.floor(Math.random()*KATA.length)]
+      ),
+      head: 0,
+      hue: Math.random() < 0.05 ? 'amber' : (Math.random() < 0.1 ? 'cyan' : 'green'),
+    });
+  }
+}
+function drawMatrix(dt){
+  if (!S.rainOn) return;
+  const intensity = 0.55 + S.breathIntensity * 0.4 + S.soundEnergy * 0.5;
+  for (const col of matrixCols){
+    col.y += col.speed * dt * (1 + S.soundEnergy * 1.5);
+    if (col.y > H + col.fontSize * col.chars.length){
+      col.y = -col.fontSize * col.chars.length - Math.random()*200;
+      col.speed = 30 + Math.random() * 90;
+    }
+    const f = col.fontSize;
+    for (let i = 0; i < col.chars.length; i++){
+      const y = col.y - i * f;
+      if (y < -f || y > H + f) continue;
+      const a = (1 - i / col.chars.length);
+      const flick = 0.85 + Math.random() * 0.15;
+      let col1;
+      if (i === 0){
+        // Kopf: heller, weißgrün
+        col1 = `rgba(220,255,230,${(0.9 * a * intensity * flick).toFixed(3)})`;
+      } else {
+        if (col.hue === 'amber')
+          col1 = `rgba(255,180,80,${(0.55 * a * intensity).toFixed(3)})`;
+        else if (col.hue === 'cyan')
+          col1 = `rgba(120,240,255,${(0.5 * a * intensity).toFixed(3)})`;
+        else
+          col1 = `rgba(0,255,106,${(0.55 * a * intensity).toFixed(3)})`;
+      }
+      ctx.fillStyle = col1;
+      const ch = col.chars[(i + col.head) % col.chars.length];
+      ctx.font = `${f}px "Courier New", monospace`;
+      ctx.textBaseline = 'top';
+      ctx.fillText(ch, col.x, y);
+      // gelegentlicher Buchstaben-Mutation
+      if (Math.random() < 0.008){
+        col.chars[(i + col.head) % col.chars.length] =
+          KATA[Math.floor(Math.random()*KATA.length)];
+      }
+    }
+    col.head += 1;
+  }
+}
+
+/* ─── STARS / GLIMMER (Background) ────────────────────── */
+let stars = [];
+function buildStars(){
+  stars = [];
+  const n = Math.floor((W * H) / 12000);
+  for (let i = 0; i < n; i++){
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H * 0.85,
+      r: Math.random() * 1.4 + 0.2,
+      ph: Math.random() * Math.PI * 2,
+      sp: 0.4 + Math.random() * 1.4,
+    });
+  }
+}
+function drawStars(){
+  for (const s of stars){
+    const a = 0.15 + 0.55 * (0.5 + 0.5*Math.sin(S.t * s.sp + s.ph));
+    ctx.fillStyle = `rgba(150,200,190,${a.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+/* ─── MUSHROOMS (bioluminescent) ──────────────────────── */
+let mushrooms = [];
+function buildMushrooms(){
+  mushrooms = [];
+  const colors = [
+    { hue:'green',  c1:'#aaffcc', c2:'#39ff88', c3:'#0a5a2a' },
+    { hue:'cyan',   c1:'#b8f4ff', c2:'#5cf0ff', c3:'#0a4a5e' },
+    { hue:'violet', c1:'#e4c4ff', c2:'#b388ff', c3:'#3a1a5e' },
+    { hue:'magenta',c1:'#ffc4e4', c2:'#ff3ea5', c3:'#5e0a3a' },
+    { hue:'amber',  c1:'#ffe0b0', c2:'#ff8a2a', c3:'#5e2a0a' },
+  ];
+  // back layer (small)
+  for (let i = 0; i < 22; i++){
+    const c = colors[Math.floor(Math.random()*colors.length)];
+    mushrooms.push({
+      x: Math.random() * W,
+      y: H * (0.45 + Math.random() * 0.25),
+      size: 18 + Math.random() * 28,
+      color: c,
+      ph: Math.random() * Math.PI * 2,
+      sp: 0.6 + Math.random() * 1.1,
+      layer: 0.55,
+      sway: Math.random() * 0.6 - 0.3,
+      bloom: 0.55 + Math.random() * 0.35,
+    });
+  }
+  // mid layer
+  for (let i = 0; i < 14; i++){
+    const c = colors[Math.floor(Math.random()*colors.length)];
+    mushrooms.push({
+      x: Math.random() * W,
+      y: H * (0.65 + Math.random() * 0.15),
+      size: 40 + Math.random() * 55,
+      color: c,
+      ph: Math.random() * Math.PI * 2,
+      sp: 0.5 + Math.random() * 1.0,
+      layer: 0.85,
+      sway: Math.random() * 0.8 - 0.4,
+      bloom: 0.8 + Math.random() * 0.4,
+    });
+  }
+  // foreground (big)
+  for (let i = 0; i < 7; i++){
+    const c = colors[Math.floor(Math.random()*colors.length)];
+    mushrooms.push({
+      x: (i + Math.random() * 0.9) * (W / 7),
+      y: H * (0.86 + Math.random() * 0.08),
+      size: 90 + Math.random() * 90,
+      color: c,
+      ph: Math.random() * Math.PI * 2,
+      sp: 0.35 + Math.random() * 0.7,
+      layer: 1.25,
+      sway: Math.random() * 1.1 - 0.5,
+      bloom: 1.0 + Math.random() * 0.5,
+    });
+  }
+}
+function drawMushroom(m){
+  const pulse = 0.6 + 0.4 * Math.sin(S.t * m.sp * 0.6 + m.ph);
+  const glow = (0.55 + pulse * 0.55) * m.bloom *
+               (0.7 + S.soundEnergy * 0.8 + S.breathIntensity * 0.3);
+  const capW = m.size;
+  const capH = m.size * 0.62;
+  const stemW = m.size * 0.13;
+  const stemH = m.size * 1.15;
+
+  const cx = m.x + Math.sin(S.t * 0.4 + m.ph) * m.sway * 4;
+  const cy = m.y;
+  const capY = cy - stemH;
+
+  // Stem (subtle)
+  ctx.save();
+  const stemGrad = ctx.createLinearGradient(cx, capY, cx, cy);
+  stemGrad.addColorStop(0, m.color.c2);
+  stemGrad.addColorStop(1, 'rgba(10,20,25,0.9)');
+  ctx.fillStyle = stemGrad;
+  ctx.globalAlpha = 0.75;
+  ctx.beginPath();
+  ctx.moveTo(cx - stemW, cy);
+  ctx.quadraticCurveTo(cx - stemW * 0.7, capY + stemH * 0.4, cx - stemW * 0.55, capY);
+  ctx.lineTo(cx + stemW * 0.55, capY);
+  ctx.quadraticCurveTo(cx + stemW * 0.7, capY + stemH * 0.4, cx + stemW, cy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Glow halo
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const halo = ctx.createRadialGradient(cx, capY, 0, cx, capY, capW * 1.5);
+  halo.addColorStop(0, hexA(m.color.c1, 0.55 * glow));
+  halo.addColorStop(0.35, hexA(m.color.c2, 0.30 * glow));
+  halo.addColorStop(1, hexA(m.color.c2, 0));
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, capY, capW * 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Cap
+  ctx.save();
+  const capGrad = ctx.createRadialGradient(
+    cx - capW * 0.2, capY - capH * 0.55, capW * 0.05,
+    cx, capY, capW
+  );
+  capGrad.addColorStop(0, m.color.c1);
+  capGrad.addColorStop(0.45, m.color.c2);
+  capGrad.addColorStop(1, m.color.c3);
+  ctx.fillStyle = capGrad;
+  ctx.beginPath();
+  ctx.ellipse(cx, capY, capW * 0.62, capH * 0.62, 0, Math.PI, 0);
+  ctx.lineTo(cx + capW * 0.62, capY);
+  ctx.quadraticCurveTo(cx, capY + capH * 0.28, cx - capW * 0.62, capY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cap spots
+  ctx.globalAlpha = 0.55 + 0.35 * pulse;
+  ctx.fillStyle = hexA('#ffffff', 0.5 * glow);
+  for (let i = 0; i < 4; i++){
+    const a = -Math.PI * 0.15 - i * 0.35 + Math.sin(S.t*0.5 + i + m.ph) * 0.03;
+    const r = capW * (0.18 + Math.random() * 0.1);
+    const px = cx + Math.cos(a) * capW * 0.4;
+    const py = capY + Math.sin(a) * capH * 0.32;
+    ctx.beginPath();
+    ctx.arc(px, py, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Spores around mushroom
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const sporeCount = Math.round(4 + glow * 6);
+  for (let i = 0; i < sporeCount; i++){
+    const a = (i / sporeCount) * Math.PI * 2 + S.t * 0.6 + m.ph;
+    const rr = capW * (0.7 + Math.random() * 0.6);
+    const sx = cx + Math.cos(a) * rr;
+    const sy = capY + Math.sin(a) * rr * 0.7 - Math.sin(S.t*1.5 + i)*4;
+    const sr = 0.6 + Math.random() * 1.6;
+    ctx.fillStyle = hexA(m.color.c1, 0.5 * glow);
+    ctx.beginPath();
+    ctx.arc(sx, sy, sr, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // small glowing dots on stem base
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 3; i++){
+    const bx = cx + (Math.random() - 0.5) * stemW * 3;
+    const by = cy - Math.random() * 8;
+    ctx.fillStyle = hexA(m.color.c2, 0.4 * glow);
+    ctx.beginPath();
+    ctx.arc(bx, by, 1.2, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ─── CABLES / VINES (dark, glowing edges) ───────────── */
+let cables = [];
+function buildCables(){
+  cables = [];
+  const n = 12;
+  for (let i = 0; i < n; i++){
+    const pts = [];
+    const x0 = Math.random() * W;
+    const y0 = -20;
+    const len = 6 + Math.floor(Math.random() * 4);
+    for (let k = 0; k < len; k++){
+      pts.push({
+        x: x0 + (Math.random() - 0.5) * 160 + Math.sin(i + k)*40,
+        y: y0 + (k / len) * (H * 0.85) + Math.random() * 40,
+      });
+    }
+    cables.push({
+      pts,
+      hue: Math.random() < 0.4 ? 'cyan' : (Math.random() < 0.5 ? 'green' : 'dim'),
+      w: 4 + Math.random() * 6,
+      ph: Math.random() * Math.PI * 2,
+    });
+  }
+}
+function drawCables(){
+  for (const c of cables){
+    // dark tube
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(6,14,20,0.95)';
+    ctx.lineWidth = c.w;
+    ctx.beginPath();
+    c.pts.forEach((p, i) => {
+      const sway = Math.sin(S.t * 0.3 + i * 0.5 + c.ph) * 4;
+      if (i === 0) ctx.moveTo(p.x + sway, p.y);
+      else ctx.lineTo(p.x + sway, p.y);
+    });
+    ctx.stroke();
+
+    // inner glow line
+    const lineCol = c.hue === 'cyan'
+      ? `rgba(120,240,255,${0.18 + S.soundEnergy * 0.2})`
+      : c.hue === 'green'
+      ? `rgba(0,255,106,${0.20 + S.soundEnergy * 0.2})`
+      : `rgba(255,138,42,${0.10 + S.soundEnergy * 0.12})`;
+    ctx.strokeStyle = lineCol;
+    ctx.lineWidth = Math.max(1, c.w * 0.18);
+    ctx.shadowColor = lineCol;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    c.pts.forEach((p, i) => {
+      const sway = Math.sin(S.t * 0.3 + i * 0.5 + c.ph) * 4;
+      if (i === 0) ctx.moveTo(p.x + sway, p.y);
+      else ctx.lineTo(p.x + sway, p.y);
+    });
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/* ─── THE GHOST (hooded figure with lightsaber) ───────── */
+// Drawn as a stylised silhouette with a strong orange glowing blade.
+function drawGhost(){
+  const baseX = W * 0.56;
+  const baseY = H * 0.46;
+  const scale = Math.min(W / 1500, H / 950) * 1.05;
+
+  // subtle floating
+  const bob = Math.sin(S.t * 0.8) * 4 + Math.sin(S.t * 0.3) * 3;
+  const breathe = S.breathIntensity * 4;
+  const cx = baseX;
+  const cy = baseY + bob;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+
+  /* Platform under the figure */
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const platGlow = ctx.createRadialGradient(0, 130, 0, 0, 130, 340);
+  platGlow.addColorStop(0, `rgba(0,255,106,${0.25 + S.soundEnergy*0.15})`);
+  platGlow.addColorStop(0.5, `rgba(0,255,106,0.06)`);
+  platGlow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = platGlow;
+  ctx.fillRect(-340, -20, 680, 300);
+  ctx.restore();
+
+  /* Robe / body */
+  ctx.save();
+  // robe silhouette
+  const robeGrad = ctx.createLinearGradient(0, -180, 0, 160);
+  robeGrad.addColorStop(0, '#d9c9a3');
+  robeGrad.addColorStop(0.35, '#c9b58b');
+  robeGrad.addColorStop(0.7, '#7a6a4a');
+  robeGrad.addColorStop(1, '#3a3222');
+  ctx.fillStyle = robeGrad;
+  ctx.beginPath();
+  // left shoulder → chest → right shoulder
+  ctx.moveTo(-52, -150);
+  ctx.quadraticCurveTo(-88, -60, -120, 150);
+  ctx.lineTo(150, 150);
+  ctx.quadraticCurveTo(120, -40, 70, -140);
+  ctx.quadraticCurveTo(30, -180, -20, -175);
+  ctx.closePath();
+  ctx.fill();
+
+  // fold shading
+  ctx.strokeStyle = 'rgba(40,30,15,0.35)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 4; i++){
+    ctx.beginPath();
+    ctx.moveTo(-30 + i*28, -80);
+    ctx.quadraticCurveTo(-40 + i*30, 20, -50 + i*32, 148);
+    ctx.stroke();
+  }
+
+  // Belt / sash
+  ctx.fillStyle = '#4a3a22';
+  ctx.fillRect(-70, -30, 200, 22);
+  ctx.fillStyle = '#1a1208';
+  ctx.fillRect(-70, -30, 200, 4);
+  ctx.fillRect(-70, -14, 200, 4);
+  ctx.restore();
+
+  /* Hood + head */
+  ctx.save();
+  // hood (dark)
+  ctx.fillStyle = '#1a1410';
+  ctx.beginPath();
+  ctx.moveTo(-58, -150);
+  ctx.quadraticCurveTo(-90, -230, -20, -240);
+  ctx.quadraticCurveTo(60, -245, 78, -180);
+  ctx.quadraticCurveTo(60, -140, 40, -140);
+  ctx.quadraticCurveTo(20, -150, -10, -148);
+  ctx.closePath();
+  ctx.fill();
+
+  // hood inner shadow (facing)
+  const hoodGrad = ctx.createRadialGradient(15, -190, 5, 15, -195, 60);
+  hoodGrad.addColorStop(0, '#0a0806');
+  hoodGrad.addColorStop(1, 'rgba(20,16,12,0.05)');
+  ctx.fillStyle = hoodGrad;
+  ctx.beginPath();
+  ctx.ellipse(15, -190, 46, 52, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // faint glow eye (if you squint)
+  ctx.globalCompositeOperation = 'lighter';
+  const eyeAlpha = 0.25 + S.soundEnergy * 0.4 + S.breathIntensity * 0.2;
+  ctx.fillStyle = `rgba(255,160,60,${eyeAlpha.toFixed(3)})`;
+  ctx.beginPath();
+  ctx.arc(28, -196, 3.5, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  /* Extended arm holding hilt */
+  // hilt held around (130, -60); blade extends down-right
+  const hx = 130, hy = -55;
+
+  // Hilt
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(0.45);
+  ctx.fillStyle = '#1a1a1c';
+  ctx.fillRect(-10, -6, 44, 12);
+  ctx.fillStyle = '#3a3a3e';
+  ctx.fillRect(-10, -6, 6, 12);
+  ctx.fillRect(24, -6, 10, 12);
+  ctx.fillStyle = '#666';
+  ctx.fillRect(2, -7, 3, 14);
+  ctx.fillRect(9, -7, 3, 14);
+  ctx.fillRect(16, -7, 3, 14);
+  ctx.restore();
+
+  // Hand (gloved, subtle)
+  ctx.save();
+  ctx.fillStyle = '#2a1e14';
+  ctx.beginPath();
+  ctx.ellipse(128, -58, 14, 10, 0.3, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  // Blade (long orange lightsaber)
+  ctx.save();
+  const bladeLen = 320;
+  const bladeAngle = 0.45;
+  const bx0 = hx + Math.cos(bladeAngle) * 4;
+  const by0 = hy + Math.sin(bladeAngle) * 4;
+  const bx1 = bx0 + Math.cos(bladeAngle) * bladeLen;
+  const by1 = by0 + Math.sin(bladeAngle) * bladeLen;
+
+  // outer bloom
+  ctx.globalCompositeOperation = 'lighter';
+  const flicker = 0.85 + Math.random() * 0.15 + S.soundPulse * 0.4;
+  const outerGlow = ctx.createLinearGradient(bx0, by0, bx1, by1);
+  outerGlow.addColorStop(0, `rgba(255,160,60,${0.55*flicker})`);
+  outerGlow.addColorStop(0.6, `rgba(255,110,30,${0.35*flicker})`);
+  outerGlow.addColorStop(1, `rgba(255,60,10,0)`);
+  ctx.strokeStyle = outerGlow;
+  ctx.lineWidth = 42 * flicker;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(bx0, by0);
+  ctx.lineTo(bx1, by1);
+  ctx.stroke();
+
+  // mid glow
+  ctx.strokeStyle = `rgba(255,180,80,${0.85*flicker})`;
+  ctx.lineWidth = 18;
+  ctx.beginPath();
+  ctx.moveTo(bx0, by0);
+  ctx.lineTo(bx1, by1);
+  ctx.stroke();
+
+  // core
+  ctx.strokeStyle = `rgba(255,240,200,${0.95})`;
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.moveTo(bx0, by0);
+  ctx.lineTo(bx1, by1);
+  ctx.stroke();
+
+  // bright tip
+  ctx.fillStyle = `rgba(255,250,220,${0.9*flicker})`;
+  ctx.beginPath();
+  ctx.arc(bx1, by1, 5, 0, Math.PI*2);
+  ctx.fill();
+
+  // spark spawns at tip
+  if (Math.random() < 0.5 + S.soundEnergy * 0.6){
+    const tipWX = cx + bx1 * scale;
+    const tipWY = cy + by1 * scale;
+    for (let i = 0; i < 2; i++){
+      spawnSpark(
+        tipWX + (Math.random()-0.5)*6,
+        tipWY + (Math.random()-0.5)*6,
+        Math.random() < 0.7 ? '#ffb347' : '#ffffff',
+        1, 'spark'
+      );
+    }
+  }
+  ctx.restore();
+
+  // reflection glow under figure
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const under = ctx.createRadialGradient(0, 150, 0, 0, 150, 260);
+  under.addColorStop(0, `rgba(255,140,40,${0.22 + S.soundEnergy*0.2})`);
+  under.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = under;
+  ctx.beginPath();
+  ctx.ellipse(0, 155, 260, 40, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore(); // end ghost transform
+}
+
+/* ─── SPARKS ──────────────────────────────────────────── */
+function spawnSpark(x, y, color, count = 1, kind = 'spark'){
+  for (let i = 0; i < count; i++){
+    const a = Math.random() * Math.PI * 2;
+    const sp = 0.6 + Math.random() * 2.4;
+    S.sparks.push({
+      x, y,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp - 0.3,
+      life: 1, maxLife: 60 + Math.random() * 80,
+      color, size: 1 + Math.random() * 2.2,
+      kind,
+    });
+  }
+  if (S.sparks.length > 700) S.sparks.splice(0, S.sparks.length - 700);
+}
+function updateSparks(dt){
+  for (let i = S.sparks.length - 1; i >= 0; i--){
+    const p = S.sparks[i];
+    p.x += p.vx * dt * 60 * (1 + S.soundEnergy * 1.5);
+    p.y += p.vy * dt * 60 * (1 + S.soundEnergy * 1.5);
+    p.vx *= 0.97; p.vy *= 0.97;
+    p.vy += 0.018; // gravity
+    p.life -= dt / (p.maxLife / 60);
+    if (p.life <= 0) S.sparks.splice(i, 1);
+  }
+}
+function drawSparks(){
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const p of S.sparks){
+    const a = Math.max(0, p.life);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ─── FOG / SPORE CLOUDS ─────────────────────────────── */
+let fogBlobs = [];
+function buildFog(){
+  fogBlobs = [];
+  const n = 26;
+  for (let i = 0; i < n; i++){
+    fogBlobs.push({
+      x: Math.random() * W,
+      y: H * (0.5 + Math.random() * 0.5),
+      r: 120 + Math.random() * 320,
+      ph: Math.random() * Math.PI * 2,
+      sp: 0.05 + Math.random() * 0.2,
+      hue: Math.random() < 0.5 ? 'green' : (Math.random() < 0.5 ? 'amber' : 'cyan'),
+      a: 0.02 + Math.random() * 0.06,
+    });
+  }
+}
+function drawFog(){
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const f of fogBlobs){
+    const dx = Math.sin(S.t * f.sp + f.ph) * 60;
+    const dy = Math.cos(S.t * f.sp * 0.7 + f.ph) * 30;
+    const col = f.hue === 'green' ? '0,255,106'
+              : f.hue === 'amber' ? '255,138,42'
+              : '92,240,255';
+    const breath = 0.7 + S.breathIntensity * 0.5 + S.soundEnergy * 0.4;
+    const g = ctx.createRadialGradient(f.x + dx, f.y + dy, 0, f.x + dx, f.y + dy, f.r);
+    g.addColorStop(0, `rgba(${col},${(f.a * breath).toFixed(3)})`);
+    g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(f.x + dx, f.y + dy, f.r, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ─── POST FX: Grain, Glitch, Chromatic Aberration ─── */
+function drawGrain(){
+  const density = 120 + S.soundEnergy * 200;
+  ctx.save();
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = 0.05 + S.soundEnergy * 0.08;
+  for (let i = 0; i < density; i++){
+    const x = Math.random() * W;
+    const y = Math.random() * H;
+    ctx.fillStyle = Math.random() < 0.5 ? '#000' : '#fff';
+    ctx.fillRect(x, y, 1, 1);
+  }
+  ctx.restore();
+}
+function drawGlitch(){
+  if (S.glitch <= 0) return;
+  const strength = S.glitch;
+  const slices = Math.floor(6 + strength * 14);
+  for (let i = 0; i < slices; i++){
+    const sy = Math.random() * H;
+    const sh = 4 + Math.random() * 22 * strength;
+    const dx = (Math.random() - 0.5) * 60 * strength;
+    // grab from canvas and redraw offset with tint
+    try {
+      const data = ctx.getImageData(0, sy, W, sh);
+      ctx.putImageData(data, dx, sy + (Math.random()-0.5)*4);
+    } catch(_){}
+  }
+  // chromatic offset bands
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.35 * strength;
+  ctx.fillStyle = '#ff3ea5';
+  ctx.fillRect((Math.random()-0.5)*40*strength, 0, W, H);
+  ctx.fillStyle = '#5cf0ff';
+  ctx.fillRect((Math.random()-0.5)*40*strength, 0, W, H);
+  ctx.restore();
+}
+
+/* ─── BREATHING ───────────────────────────────────────── */
+function updateBreath(){
+  S.breathPhase = ((performance.now() % S.breathCycle) / S.breathCycle);
+  const ph = S.breathPhase;
+  let i;
+  if (ph < 0.4) i = ph / 0.4;
+  else if (ph < 0.5) i = 1;
+  else if (ph < 0.9) i = 1 - (ph - 0.5) / 0.4;
+  else i = 0;
+  S.breathIntensity = i;
+}
+
+/* ─── AUDIO (ambient hum + analyser) ──────────────────── */
+function initAudio(){
+  if (S.audioCtx) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    S.audioCtx = new AC();
+    S.analyser = S.audioCtx.createAnalyser();
+    S.analyser.fftSize = 256;
+    S.analyser.smoothingTimeConstant = 0.82;
+    // analyser at destination
+    S.analyser.connect(S.audioCtx.destination);
+    S.audioReady = true;
+  } catch(_){}
+}
+function startHum(){
+  if (!S.audioCtx) return;
+  if (S.humOn) return;
+  const ac = S.audioCtx;
+  const master = ac.createGain();
+  master.gain.value = 0.0;
+  master.connect(S.analyser);
+
+  // deep drone (osc 1)
+  const o1 = ac.createOscillator();
+  o1.type = 'sine';
+  o1.frequency.value = 55;
+  const g1 = ac.createGain(); g1.gain.value = 0.55;
+  o1.connect(g1); g1.connect(master);
+
+  // fifth
+  const o2 = ac.createOscillator();
+  o2.type = 'sine';
+  o2.frequency.value = 82.5;
+  const g2 = ac.createGain(); g2.gain.value = 0.3;
+  o2.connect(g2); g2.connect(master);
+
+  // shimmer (detuned triangle)
+  const o3 = ac.createOscillator();
+  o3.type = 'triangle';
+  o3.frequency.value = 220;
+  const g3 = ac.createGain(); g3.gain.value = 0.05;
+  const lfo = ac.createOscillator();
+  lfo.frequency.value = 0.25;
+  const lfoG = ac.createGain();
+  lfoG.gain.value = 0.04;
+  lfo.connect(lfoG); lfoG.connect(g3.gain);
+  o3.connect(g3); g3.connect(master);
+
+  // gentle lowpass
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 420;
+  lp.Q.value = 0.6;
+  master.disconnect();
+  master.connect(lp);
+  lp.connect(S.analyser);
+
+  o1.start(); o2.start(); o3.start(); lfo.start();
+  // fade in
+  master.gain.setValueAtTime(0, ac.currentTime);
+  master.gain.linearRampToValueAtTime(0.18, ac.currentTime + 3.0);
+
+  S.humGain = master;
+  S.humOn = true;
+  S.humNodes = { o1, o2, o3, lfo, lp, master };
+}
+function stopHum(){
+  if (!S.humOn || !S.humNodes) return;
+  const ac = S.audioCtx;
+  S.humGain.gain.cancelScheduledValues(ac.currentTime);
+  S.humGain.gain.setValueAtTime(S.humGain.gain.value, ac.currentTime);
+  S.humGain.gain.linearRampToValueAtTime(0, ac.currentTime + 0.6);
+  const nodes = S.humNodes;
+  setTimeout(() => {
+    try {
+      nodes.o1.stop(); nodes.o2.stop(); nodes.o3.stop(); nodes.lfo.stop();
+    } catch(_){}
+  }, 700);
+  S.humOn = false;
+}
+
+function readSound(now){
+  if (!S.analyser || !S.humOn){
+    // Fallback: breath-driven energy
+    const breath = S.breathIntensity;
+    S.soundEnergy += (breath * 0.5 + 0.15 - S.soundEnergy) * 0.05;
+    S.soundBass = S.soundEnergy * 0.7;
+    S.soundPulse *= 0.94;
+    return;
+  }
+  S.analyser.getByteFrequencyData(S.spectrum);
+  let total = 0, low = 0;
+  const bassBins = Math.floor(S.spectrum.length * 0.14);
+  for (let i = 0; i < S.spectrum.length; i++) total += S.spectrum[i];
+  for (let i = 0; i < bassBins; i++) low += S.spectrum[i];
+  const rawE = total / S.spectrum.length / 255;
+  const rawB = low / bassBins / 255;
+  S.soundEnergy += (rawE - S.soundEnergy) * 0.15;
+  S.soundBass += (rawB - S.soundBass) * 0.2;
+  if (rawB > 0.45 && rawB > S.soundBass + 0.08 && now - S.lastBeat > 220){
+    S.soundPulse = 1;
+    S.lastBeat = now;
+  }
+  S.soundPulse *= 0.92;
+}
+
+/* ─── CAMERA PARALLAX ─────────────────────────────────── */
+function camX(){
+  return (S.mx - 0.5) * 40 * (0.5 + S.soundEnergy);
+}
+function camY(){
+  return (S.my - 0.5) * 30 * (0.5 + S.soundEnergy);
+}
+
+/* ─── FOG VIGNETTE (soft color grade) ─────────────────── */
+function drawVignette(){
+  const g = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, Math.max(W,H)*0.75);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.6)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/* ─── NARRATION SYSTEM ────────────────────────────────── */
+const LINES = [
+  { at: 0,  head: "AMIGA · 1985",  body: "Der Regen fällt als Code. Unter ihm atmet der Schaltkreis." },
+  { at: 9,  head: "GEIST",         body: "Ein Umhang aus Kabeln. Eine Klinge aus orangem Licht." },
+  { at: 20, head: "SPOREN",        body: "Die Pilze leuchten, weil sie erinnern. Nicht weil sie sehen." },
+  { at: 32, head: "DIE KLINGE",    body: "Wer das Licht hält, hält auch die Erinnerung." },
+  { at: 46, head: "SCHALTKREIS",   body: "Zwischen den Adern fließt etwas, das man Zukunft nennt." },
+  { at: 60, head: "GEIST-EXE",     body: "Der Regen kennt deinen Namen. Er hat ihn geschrieben." },
+];
+let currentLine = -1;
+const narrationEl = document.getElementById('narration');
+function updateNarration(){
+  const active = LINES.filter(l => S.t >= l.at).pop();
+  const idx = active ? LINES.indexOf(active) : -1;
+  if (idx !== currentLine){
+    currentLine = idx;
+    if (active){
+      narrationEl.innerHTML = `<b>◈ ${active.head}</b>${active.body}`;
+      narrationEl.classList.add('show');
+    } else {
+      narrationEl.classList.remove('show');
+    }
+  }
+}
+
+/* ─── HELPERS ─────────────────────────────────────────── */
+function hexA(hex, a){
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16);
+  const g = parseInt(h.substring(2,4),16);
+  const b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+/* ─── MAIN RENDER ─────────────────────────────────────── */
+function render(dt){
+  // background
+  ctx.fillStyle = '#02040a';
+  ctx.fillRect(0, 0, W, H);
+
+  drawStars();
+
+  // parallax offset
+  const pX = camX(), pY = camY();
+
+  // Layer 1: Matrix rain (background, slow)
+  ctx.save();
+  ctx.translate(-pX * 0.3, -pY * 0.3);
+  drawMatrix(dt * 0.85);
+  ctx.restore();
+
+  // Layer 2: back mushrooms
+  ctx.save();
+  ctx.translate(-pX * 0.5, -pY * 0.5);
+  for (const m of mushrooms){
+    if (m.layer < 0.7){
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      drawMushroom(m);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+
+  // Layer 3: cables
+  ctx.save();
+  ctx.translate(-pX * 0.7, -pY * 0.7);
+  drawCables();
+  ctx.restore();
+
+  // Layer 4: The Ghost (with extended lightsaber)
+  ctx.save();
+  ctx.translate(-pX * 0.85, -pY * 0.85);
+  drawGhost();
+  ctx.restore();
+
+  // Layer 5: mid mushrooms
+  ctx.save();
+  ctx.translate(-pX * 1.0, -pY * 1.0);
+  for (const m of mushrooms){
+    if (m.layer >= 0.7 && m.layer < 1.1) drawMushroom(m);
+  }
+  ctx.restore();
+
+  // Layer 6: fog/spores
+  drawFog();
+
+  // Layer 7: sparks
+  drawSparks();
+
+  // Layer 8: foreground mushrooms
+  ctx.save();
+  ctx.translate(-pX * 1.4, -pY * 1.4);
+  for (const m of mushrooms){
+    if (m.layer >= 1.1) drawMushroom(m);
+  }
+  ctx.restore();
+
+  // Vignette darken
+  drawVignette();
+
+  // grain
+  drawGrain();
+
+  // glitch overlay
+  if (S.glitch > 0){
+    drawGlitch();
+    S.glitch *= 0.92;
+    if (S.glitch < 0.02) S.glitch = 0;
+  }
+}
+
+/* ─── MAIN LOOP ───────────────────────────────────────── */
+function loop(now){
+  const dt = Math.min(0.05, (now - S.last) / 1000);
+  S.last = now;
+  S.t += dt;
+  S.frame++;
+
+  // FPS
+  S.fpsAcc += dt; S.fpsFrames++;
+  if (S.fpsAcc > 0.5){
+    S.fps = Math.round(S.fpsFrames / S.fpsAcc);
+    S.fpsAcc = 0; S.fpsFrames = 0;
+  }
+
+  // mouse smoothing
+  S.mx += (S.tmx - S.mx) * 0.06;
+  S.my += (S.tmy - S.my) * 0.06;
+
+  if (S.breath) updateBreath();
+  updateSparks(dt);
+  readSound(now);
+
+  // ambient particle spawn rate
+  if (Math.random() < 0.4 + S.soundEnergy * 1.2){
+    const colors = ['#ffb347','#ff8a2a','#39ff88','#5cf0ff','#b388ff','#ff3ea5'];
+    spawnSpark(
+      Math.random()*W,
+      Math.random()*H,
+      colors[Math.floor(Math.random()*colors.length)],
+      1, 'spark'
+    );
+  }
+
+  render(dt);
+  updateNarration();
+  updateHUD();
+
+  requestAnimationFrame(loop);
+}
+
+/* ─── HUD UPDATES ─────────────────────────────────────── */
+const fpsLabel = document.getElementById('fpsLabel');
+const timeLabel = document.getElementById('timeLabel');
+const stateLed = document.getElementById('stateLed');
+const meterNeon = document.getElementById('meterNeon');
+const meterBass = document.getElementById('meterBass');
+let lastFpsUpdate = 0, lastTimeUpdate = 0;
+function updateHUD(){
+  if (performance.now() - lastFpsUpdate > 400){
+    lastFpsUpdate = performance.now();
+    fpsLabel.textContent = S.fps + ' FPS';
+  }
+  if (performance.now() - lastTimeUpdate > 250){
+    lastTimeUpdate = performance.now();
+    const total = Math.floor(S.t);
+    const m = String(Math.floor(total/60)).padStart(2,'0');
+    const s = String(total%60).padStart(2,'0');
+    const d = String(Math.floor((S.t*10)%10));
+    timeLabel.textContent = `00:${m}:${s}.${d}`;
+  }
+  stateLed.textContent = S.humOn ? 'GEIST · AKTIV' : 'SYSTEM WACHT';
+  meterNeon.style.width = Math.min(100, (S.soundEnergy * 180)).toFixed(0) + '%';
+  meterBass.style.width = Math.min(100, (S.soundBass * 180)).toFixed(0) + '%';
+}
+
+/* ─── INITIALISIERUNG ─────────────────────────────────── */
+function beginRuntime(){
+  initAudio();
+  if (S.audioCtx && S.audioCtx.state === 'suspended') S.audioCtx.resume();
+  startHum();
+  S.running = true;
+  document.getElementById('titlecard').classList.add('hidden');
+  S.last = performance.now();
+}
+
+/* ─── EVENTS ──────────────────────────────────────────── */
+document.getElementById('enter').addEventListener('click', beginRuntime);
+
+document.getElementById('btnBreath').addEventListener('click', (e) => {
+  S.breath = !S.breath;
+  e.target.classList.toggle('on', S.breath);
+  e.target.textContent = `◈ ATEM · ${S.breath ? 'ON' : 'OFF'}`;
+});
+document.getElementById('btnSound').addEventListener('click', (e) => {
+  if (!S.audioCtx) initAudio();
+  if (S.audioCtx.state === 'suspended') S.audioCtx.resume();
+  if (S.humOn) stopHum(); else startHum();
+  e.target.classList.toggle('on', S.humOn);
+});
+document.getElementById('btnGlitch').addEventListener('click', () => {
+  S.glitch = 1;
+  // extra sparks
+  for (let i = 0; i < 40; i++){
+    spawnSpark(W/2, H/2, ['#ff8a2a','#5cf0ff','#ff3ea5','#39ff88'][i%4], 1, 'spark');
+  }
+});
+document.getElementById('btnRain').addEventListener('click', (e) => {
+  S.rainOn = !S.rainOn;
+  e.target.classList.toggle('on', S.rainOn);
+  e.target.textContent = `${S.rainOn ? '道 MATRIX · ON' : '道 MATRIX · OFF'}`;
+});
+document.getElementById('btnWarp').addEventListener('click', (e) => {
+  S.warp = !S.warp;
+  e.target.classList.toggle('on', S.warp);
+  if (S.warp){
+    // temporarily crank spark rate
+    for (let i = 0; i < 120; i++){
+      spawnSpark(
+        Math.random()*W, Math.random()*H,
+        ['#ffb347','#5cf0ff','#ff3ea5','#39ff88','#b388ff'][i%5],
+        1, 'spark'
+      );
+    }
+    S.glitch = 0.8;
+  }
+});
+document.getElementById('btnFull').addEventListener('click', () => {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
+});
+
+window.addEventListener('mousemove', (e) => {
+  S.tmx = e.clientX / W;
+  S.tmy = e.clientY / H;
+});
+window.addEventListener('touchmove', (e) => {
+  if (e.touches[0]){
+    S.tmx = e.touches[0].clientX / W;
+    S.tmy = e.touches[0].clientY / H;
+  }
+}, { passive: true });
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space'){ e.preventDefault(); if (!S.running) beginRuntime(); else {
+    S.breath = !S.breath;
+    document.getElementById('btnBreath').classList.toggle('on', S.breath);
+    document.getElementById('btnBreath').textContent = `◈ ATEM · ${S.breath ? 'ON' : 'OFF'}`;
+  }}
+  if (e.key.toLowerCase() === 'f') document.getElementById('btnFull').click();
+  if (e.key.toLowerCase() === 'g') document.getElementById('btnGlitch').click();
+  if (e.key.toLowerCase() === 'm') document.getElementById('btnRain').click();
+  if (e.key.toLowerCase() === 's') document.getElementById('btnSound').click();
+  if (e.key.toLowerCase() === 'w') document.getElementById('btnWarp').click();
+});
+
+/* ─── BOOT ────────────────────────────────────────────── */
+resize();
+buildCables();
+requestAnimationFrame(loop);
+
+// Idle auto-glitches occasionally for atmosphere
+setInterval(() => {
+  if (S.running && Math.random() < 0.35) S.glitch = Math.max(S.glitch, 0.3);
+}, 6500);
+
+})();
+</script>
+</body>
+</html>
